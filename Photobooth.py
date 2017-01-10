@@ -39,6 +39,13 @@ def on_message(client, userdata, msg):
 #    sleep(1)
 #    camera.capture('foo.jpg')
 
+def slideshow_timer(q):
+    while True:
+        msg = mqtt.MQTTMessage("photobooth")
+        msg.payload = b'next'
+        q.put(msg)
+        sleep(5)
+
 def handle_event(q):
     mode = Mode.SLIDESHOW
     three_png = Image.open('3.png')    
@@ -149,6 +156,11 @@ client.connect("127.0.0.1", 1883, 60)
 worker = Thread(target=handle_event, args=(eventQ,))
 worker.setDaemon(True);
 worker.start()
+
+
+slideshow_timer_worker = Thread(target=slideshow_timer, args=(eventQ,))
+slideshow_timer_worker.setDaemon(True);
+slideshow_timer_worker.start()
 
 client.loop_forever()
 
