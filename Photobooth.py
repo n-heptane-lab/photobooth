@@ -9,6 +9,7 @@ from enum import Enum
 from PIL import Image
 import datetime
 import time
+import os
 
 class Mode(Enum):
     SLIDESHOW = 1
@@ -61,16 +62,35 @@ def handle_event(q):
 
     review = Image.new('RGB', res);
     review_o = None;
+    filename = ""
 
-
+    slideshow_files = [f for f in os.listdir("approve") if f.endswith('.jpg')]
+    slideshow_index = 0
+    slideshow_o = None;
     while True:
         msg = q.get()
-        filename = ""
 
-        if mode == Mode.SLIDESHOW and  msg.payload == b'preview':
-            print("PREVIEW")
+        if mode == Mode.SLIDESHOW and msg.payload == b'preview':
+            print("PREVIEW")            
             mode = Mode.PREVIEW
+            if slideshow_o != None:
+                camera.remove_overlay(slideshow_o)
+                slideshow_o = None;
+
             camera.start_preview(fullscreen=True)
+            
+        if mode == Mode.SLIDESHOW and msg.payload == b'next':
+            print("NEXT")
+            slideshow_index = slideshow_index + 1
+            if slideshow_index >= len(slideshow_files):
+                slideshow_index = 0
+            if slideshow_o != None:
+                camera.remove_overlay(slideshow_o)
+            slideshow_jpg = Image.open("approve/"+slideshow_files[slideshow_index])
+            slideshow_o = camera.add_overlay(slideshow_jpg.tobytes(), size=slideshow_jpg.size)
+            slideshow_o.alpha=255
+            slideshow_o.layer=3
+            
         elif mode == Mode.PREVIEW and msg.payload == b'shutter':
             print("SHUTTER");
             o = camera.add_overlay(three.tobytes(), size=three.size)
@@ -93,7 +113,6 @@ def handle_event(q):
             camera.capture(filename);
             camera.stop_preview();
             review_jpg = Image.open(filename)
-
             review_o = camera.add_overlay(review_jpg.tobytes(), size=review_jpg.size)
             review_o.alpha=255
             review_o.layer=3
@@ -102,10 +121,15 @@ def handle_event(q):
         elif mode == Mode.REVIEW and msg.payload == b'approve':
             print("SLIDESHOW")
             camera.remove_overlay(review_o);
+            os.rename(filename, "approve/"+filename);
+            slideshow_files.append(filename);
+            filename = ""
             mode = Mode.SLIDESHOW
         elif mode == Mode.REVIEW and msg.payload == b'reject':
             print("SLIDESHOW")
             camera.remove_overlay(review_o);            
+            os.rename(filename, "reject/"+filename);
+            filename = ""
             mode = Mode.SLIDESHOW
         else:
             print (mode, str(msg.payload))
